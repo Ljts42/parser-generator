@@ -1,0 +1,39 @@
+%Lab2.CLexer% <, CToken (..)>
+<()> <()>
+<CToken> <SKIP>
+
+{
+data CToken = NAME String | POINTER | COMMA | SEMICOLON
+            | SKIP | EPS | END
+                deriving (Eq, Show)
+}
+
+"\*"                        {\_ -> return POINTER}
+"\;"                        {\_ -> return SEMICOLON}
+"\,"                        {\_ -> return COMMA}
+"[a-zA-Z_][a-zA-Z0-9_]*"    {\s -> return $ NAME s}
+"\s+"                       ;
+
+
+%Lab2.CParser% <, Tree (..)>
+<CToken>
+POINTER COMMA SEMICOLON EPS END;
+NAME;
+
+{
+import Lab2.GraphViz
+import Lab2.CLexer (CToken (..))
+}
+
+S {} {}: <Tree>
+  | NAME<> P<> N<> SEMICOLON<> S<>  {return $ Node "S" [Node s1 [], w2, w3, Node ";" [], w5]}
+  | SEMICOLON<> S<>                 {return $ Node "S" [Node ";" [], w2]}
+  | EPS<>                           {return $ Node "S" []}
+
+P {} {}: <Tree>
+  | POINTER<> P<>                   {return $ Node "P" [Node "*" [], w2]}
+  | NAME<>                          {return $ Node "P" [Node s1 []]}
+
+N {} {}: <Tree>
+  | COMMA<> P<> N<>                 {return $ Node "N" [Node "," [], w2, w3]}
+  | EPS<>                           {return $ Node "N" []}

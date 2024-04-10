@@ -1,0 +1,64 @@
+%Calc.MyLexer% <, CalcToken (..)>
+<()> <()>
+<CalcToken> <SKIP>
+
+{
+data CalcToken = NUMBER String | LP | RP
+               | MUL | DIV | SUB | ADD
+               | SKIP | EPS | END | LOG
+                  deriving (Eq, Show)
+}
+
+"lg"                {\_ -> return LOG}
+"\*"                  {\_ -> return MUL}
+"\/"                  {\_ -> return DIV}
+"\+"                  {\_ -> return ADD}
+"\-"                  {\_ -> return SUB}
+"\("                  {\_ -> return LP}
+"\)"                  {\_ -> return RP}
+"[0-9]+\.?[0-9]*"     {\s -> return $ NUMBER s}
+"\s+"       ;
+
+
+%Calc.MyParser% <>
+<CalcToken>
+LP RP MUL DIV SUB ADD EPS END LOG;
+NUMBER;
+
+{
+import Calc.MyLexer (CalcToken (..))
+}
+
+S {} {}: <Double>
+  | E<(0 +)>                          {return w1}
+
+E {(Double -> Double)} {f}: <Double>
+  | P<> EP<(f w1)>                    {return w2}
+
+EP {Double} {a}: <Double>
+  | ADD<> E<(a +)>                    {return w2}
+  | SUB<> E<(a -)>                    {return w2}
+  | EPS<>                             {return a}
+
+P {} {}: <Double>
+  | T<(1 *)>                          {return w1}
+
+T {(Double -> Double)} {f}: <Double>
+  | D<> TP<(f w1)>                    {return w2}
+
+TP {Double} {a}: <Double>
+  | MUL<> T<(a *)>                    {return w2}
+  | DIV<> T<(a /)>                    {return w2}
+  | EPS<>                             {return a}
+
+D {} {}: <Double>
+  | F<> DP<>                          {return (if (w2 == 1) then w1 else logBase w2 w1)}
+
+DP {} {}: <Double>
+  | LOG<> D<>                         {return w2}
+  | EPS<>                             {return 1}
+
+F {} {}: <Double>
+  | SUB<> F<>                     {return (-w2)}
+  | LP<> S<> RP<>                     {return w2}
+  | NUMBER<>                          {return (read s1 :: Double)}

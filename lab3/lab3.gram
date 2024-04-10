@@ -1,0 +1,119 @@
+%Lab3.PythonLexer% <, PythonToken (..), scanTokens>
+<Int> <0>
+<[PythonToken]> <[SKIP]>
+
+{
+data PythonToken = INDENT | DEDENT
+                 | INPUT | PRINT | RANGE | WHILE | FOR | INT | IF | IN
+                 | TRUE | FALSE | NOT | AND | OR | EQUAL | NEQ | LEQ | LESS | GEQ | GREATER
+                 | ASSIGN | COLON | COMMA | LEFTP | RIGHTP
+                 | MUL | DIV | MOD | ADD | SUB
+                 | NUMBER String | VAR String
+                 | SKIP | EPS | END
+                    deriving (Show, Eq)
+
+scanTokens :: String -> [MyToken]
+scanTokens inp = concat $ tokenize inp
+}
+
+"\n([\ ]{4}|\t)*"         {\s -> do
+                            previous <- get
+                            let current = if (take 2 s) == "\n\t" 
+                                then (length s) - 1
+                                else ((length s) - 1) `div` 4
+                            if (current > previous)
+                                then do
+                                    put current
+                                    return $ replicate (current - previous) INDENT
+                                else if (current < previous)
+                                    then do
+                                        put current
+                                        return $ replicate (previous - current) DEDENT
+                                    else return []}
+"\s"                        ;
+"input"                     {\_ -> return [INPUT]}
+"print"                     {\_ -> return [PRINT]}
+"range"                     {\_ -> return [RANGE]}
+"while"                     {\_ -> return [WHILE]}
+"for"                       {\_ -> return [FOR]}
+"int"                       {\_ -> return [INT]}
+"if"                        {\_ -> return [IF]}
+"in"                        {\_ -> return [IN]}
+"True"                      {\_ -> return [TRUE]}
+"False"                     {\_ -> return [FALSE]}
+"not"                       {\_ -> return [NOT]}
+"and"                       {\_ -> return [AND]}
+"or"                        {\_ -> return [OR]}
+"=="                        {\_ -> return [EQUAL]}
+"!="                        {\_ -> return [NEQ]}
+"<="                        {\_ -> return [LEQ]}
+"<"                         {\_ -> return [LESS]}
+">="                        {\_ -> return [GEQ]}
+">"                         {\_ -> return [GREATER]}
+"="                         {\_ -> return [ASSIGN]}
+":"                         {\_ -> return [COLON]}
+","                         {\_ -> return [COMMA]}
+"\("                        {\_ -> return [LEFTP]}
+"\)"                        {\_ -> return [RIGHTP]}
+"\*"                        {\_ -> return [MUL]}
+"//"                        {\_ -> return [DIV]}
+"%"                         {\_ -> return [MOD]}
+"\+"                        {\_ -> return [ADD]}
+"-"                         {\_ -> return [SUB]}
+"[0-9]+"                    {\s -> return [NUMBER s]}
+"[a-zA-Z_][a-zA-Z0-9_]*"    {\s -> return [VAR s]}
+
+
+%Lab3.PythonParser% <, Line (..), Expr (..)>
+<PythonToken>
+INDENT DEDENT INPUT PRINT RANGE WHILE FOR INT IF IN
+TRUE FALSE NOT AND OR EQUAL NEQ LEQ LESS GEQ GREATER
+ASSIGN COLON COMMA LEFTP RIGHTP
+MUL DIV MOD ADD SUB END EPS;
+
+NUMBER VAR;
+
+{
+import Lab3.PythonGrammar
+import Lab3.PythonLexer (PythonToken (..))
+}
+
+Code {} {}: <[Line]>
+  | Line<> Code<>                                                     {return (w1 : w2)}
+  | EPS<>                                                             {return []}
+
+Line {} {}: <Line>
+  | VAR<> ASSIGN<> INT<> LEFTP<> INPUT<> LEFTP<> RIGHTP<> RIGHTP<>    {return $ IntInput s1}
+  | VAR<> ASSIGN<> Expr<>                                             {return $ Assign s1 w3}
+  | IF<> Expr<> Block<>                                               {return $ If w2 w3}
+  | WHILE<> Expr<> Block<>                                            {return $ While w2 w3}
+  | FOR<> VAR<> IN<> RANGE<> LEFTP<> Expr<> RIGHTP<> Block<>          {return $ For s2 w6 w8}
+  | PRINT<> LEFTP<> Expr<> Rest<> RIGHTP<>                            {return $ Print (w3 : w4)}
+
+Block {} {}: <[Line]>
+  | COLON<> INDENT<> Code<> DEDENT<>                                  {return w3}
+
+Rest {} {}: <[Expr]>
+  | COMMA<> Expr<> Rest<>                                             {return (w2 : w3)}
+  | EPS<>                                                             {return []}
+
+Expr {} {}: <Expr>
+  | TRUE<>                                                            {return $ TrueVal}
+  | FALSE<>                                                           {return $ FalseVal}
+  | NUMBER<>                                                          {return $ Number s1}
+  | VAR<>                                                             {return $ Var s1}
+  | Expr<> MUL<> Expr<>                                               {return $ Binary Mul w1 w3}
+  | Expr<> DIV<> Expr<>                                               {return $ Binary Div w1 w3}
+  | Expr<> MOD<> Expr<>                                               {return $ Binary Mod w1 w3}
+  | Expr<> ADD<> Expr<>                                               {return $ Binary Add w1 w3}
+  | Expr<> SUB<> Expr<>                                               {return $ Binary Sub w1 w3}
+  | Expr<> EQUAL<> Expr<>                                             {return $ Binary Equal w1 w3}
+  | Expr<> NEQ<> Expr<>                                               {return $ Binary Neq w1 w3}
+  | Expr<> LEQ<> Expr<>                                               {return $ Binary Leq w1 w3}
+  | Expr<> LESS<> Expr<>                                              {return $ Binary Less w1 w3}
+  | Expr<> GEQ<> Expr<>                                               {return $ Binary Geq w1 w3}
+  | Expr<> GREATER<> Expr<>                                           {return $ Binary Greater w1 w3}
+  | NOT<> Expr<>                                                      {return $ Not w2}
+  | Expr<> AND<> Expr<>                                               {return $ Binary And w1 w3}
+  | Expr<> OR<> Expr<>                                                {return $ Binary Or w1 w3}
+  | LEFTP<> Expr<> RIGHTP<>                                           {return $ Brackets w2}
